@@ -54,8 +54,8 @@ class App extends Component {
 
   createWebsocket = clientId => {
     var ws = new WebSocket(
-      `ws://${window.location.hostname}:${window.location
-        .port}/api?id=${clientId}`
+      `${window.location.protocol != "https:" ? "ws" : "wss"}://${window
+        .location.hostname}:${window.location.port}/api?id=${clientId}`
     );
     ws.onopen = e => {
       console.log("WebSocketClient connected:", e);
