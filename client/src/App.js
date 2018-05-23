@@ -3,8 +3,6 @@ import logo from "./logo.svg";
 import "./App.css";
 import Autocomplete from "react-autocomplete";
 import moment from "moment";
-import ReconnectingWebSocket from "reconnecting-websocket";
-import WebSocketClient from "./WebSocketClient";
 import BootstrapTable from "react-bootstrap-table-next";
 import DatePicker from "react-16-bootstrap-date-picker";
 import Autosuggest from "./Autosuggest";

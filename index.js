@@ -5,6 +5,7 @@ var moment = require("moment");
 var delay = require("delay");
 var url = require("url");
 var _ = require("lodash");
+var path = require("path");
 // this should save cookies
 var request = require("request-promise");
 // var jar = request.jar();
@@ -124,6 +125,7 @@ var sendOther = (clientId, type, data) => {
     console.log(`client is closed. cant send "${data}"`);
   }
 };
+
 app.post("/api/getTrains", async (req, res) => {
   const { sourceStation, destinationStation, date, clientId } = req.body;
   var numJars = 10;
@@ -244,6 +246,16 @@ app.post("/api/getTrains", async (req, res) => {
   console.log("done");
   sendInfo(clientId, "Done.");
 });
+
+// react
+if (process.env.NODE_ENV == "production") {
+  console.log("prod env");
+  app.use(express.static(path.join(__dirname, "./client/build")));
+
+  app.get("/*", function(req, res) {
+    res.sendFile(path.join(__dirname, "./client/build", "index.html"));
+  });
+}
 
 // app.listen(process.env.PORT, () =>
 //   console.log(`Example app listening on port ${process.env.PORT}!`)

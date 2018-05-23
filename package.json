@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "buildclient": "cd client && yarn install && npm run build",
+    "postinstall": "npm run buildclient"
   },
   "author": "",
   "license": "ISC",
@@ -20,5 +23,6 @@
     "request-debug": "^0.2.0",
     "request-promise": "^4.2.2",
     "ws": "^5.2.0"
-  }
+  },
+  "cacheDirectories": ["node_modules", "client/node_modules"]
 }
