@@ -6,6 +6,8 @@ var delay = require("delay");
 var url = require("url");
 var _ = require("lodash");
 var path = require("path");
+var compression = require("compression");
+
 // this should save cookies
 var request = require("request-promise");
 // var jar = request.jar();
@@ -19,6 +21,8 @@ var http = require("http");
 
 const express = require("express");
 const app = express();
+// use compression
+app.use(compression());
 let server = http.Server(app);
 
 var ws = require("ws");
@@ -85,7 +89,7 @@ var solveCaptcha = async (jar, idx) => {
   );
   fs.writeFileSync(`/tmp/image${idx}.png`, img, "binary");
   val = child_process.execSync(
-    `cd scripts && python template_matching.py /tmp/image${idx}.png`
+    `cd scripts && python template_matching.py /tmp/image${idx}.png 2>/dev/null`
   );
   return val.toString().trim();
 };
