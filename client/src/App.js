@@ -36,10 +36,11 @@ class App extends Component {
   state = {
     ac: [],
     date: moment(new Date())
-      .add(7, "days")
+      // .add(7, "days")
       .toISOString(),
-    sourceStation: "NEW DELHI - NDLS",
-    destinationStation: "LUCKNOW NR - LKO",
+    currentQueryDate: null,
+    sourceStation: "",
+    destinationStation: "",
     infoMessage: "",
     trains: [],
     disabled: false,
@@ -70,9 +71,21 @@ class App extends Component {
           this.setState({ infoMessage: message.data });
           break;
         case "train":
-          this.setState({
-            trains: this.state.trains.concat([JSON.parse(message.data)])
-          });
+          // make sure this train has correct availablity shit, only then add
+          const { currentQueryDate } = this.state;
+          const formattedDate = moment(currentQueryDate).format("D-M-YYYY");
+          var train = JSON.parse(message.data);
+          if (train.avlDayList) {
+            var avlInfo = train.avlDayList.find(
+              ({ availablityDate }) => availablityDate == formattedDate
+            );
+            if (avlInfo) {
+              train = { ...train, ...avlInfo };
+              this.setState({
+                trains: this.state.trains.concat([train])
+              });
+            }
+          }
           break;
         case "numFetches":
           this.setState({
@@ -126,7 +139,8 @@ class App extends Component {
     this.setState({
       disabled: true,
       numFetches: 0,
-      trains: []
+      trains: [],
+      currentQueryDate: date
     });
     fetch("/api/getTrains", {
       method: "POST",
@@ -166,6 +180,16 @@ class App extends Component {
       classCheckboxes,
       showWaitlist
     } = this.state;
+    const timeToNum = str => {
+      var a, b;
+      [a, b] = str.split(":");
+      return parseInt(a) * 100 + parseInt(b);
+    };
+    const timeSort = (a, b, order) => {
+      var val = timeToNum(a) - timeToNum(b);
+      if (order === "asc") return val;
+      return -val;
+    };
     const columns = [
       {
         dataField: "trainNo",
@@ -178,23 +202,40 @@ class App extends Component {
       },
       {
         dataField: "classc",
-        text: "Class"
+        text: "Class",
+        sort: true
       },
       {
         dataField: "availablityStatus",
-        text: "Availability"
+        text: "Availability",
+        formatter: (cell, row) => {
+          const colors = {
+            "1": "text-success",
+            "2": "text-warning",
+            "3": "text-warning"
+          };
+          var color = colors[row.availablityType] || "text-secondary";
+          return <p className={color}>{cell}</p>;
+        },
+        sort: true
       },
       {
         dataField: "departureTime",
-        text: "Departure Time"
+        text: "Departure Time",
+        sort: true,
+        sortFunc: timeSort
       },
       {
         dataField: "arrivalTime",
-        text: "Arrival Time"
+        text: "Arrival Time",
+        sort: true,
+        sortFunc: timeSort
       },
       {
         dataField: "duration",
-        text: "Duration"
+        text: "Duration",
+        sort: true,
+        sortFunc: timeSort
       },
       {
         dataField: "totalCollectibleAmount",
@@ -202,8 +243,10 @@ class App extends Component {
         sort: true
       }
     ];
-    const formattedDate = moment(date).format("D-M-YYYY");
-
+    const allowedClasses = classes.filter(
+      (classc, idx) => classCheckboxes[idx]
+    );
+    const allowedAvailablityTypes = showWaitlist ? ["1", "2", "3"] : ["1"];
     return (
       <div className="App container">
         <PageHeader>IRCTC Availability Checker</PageHeader>
@@ -211,24 +254,13 @@ class App extends Component {
         <div className="form-group">
           <div className="row">
             <div className="col-12 col-md-3 py-1">
-              {/*<input
-                className="form-control"
-                type="date"
-                value={this.state.date}
-                onChange={e => this.setState({ date: e.target.value })}
-              />*/}
               <DatePicker
                 id="dp"
+                minDate={moment().toISOString()}
+                dateFormat={"DD-MM-YYYY"}
                 value={this.state.date}
                 onChange={date => this.setState({ date })}
               />
-              {/*<SingleDatePicker
-              date={this.state.date} // momentPropTypes.momentObj or null
-              onDateChange={date => this.setState({ date })} // PropTypes.func.isRequired
-              focused={this.state.focused} // PropTypes.bool
-              onFocusChange={({ focused }) => this.setState({ focused })} // PropTypes.func.isRequired
-              id="your_unique_id" // PropTypes.string.isRequired,
-            />*/}
             </div>
             <div className="col-12 col-md-auto py-1">
               <Autosuggest
@@ -237,15 +269,6 @@ class App extends Component {
                 onChange={sourceStation => this.setState({ sourceStation })}
                 placeholder={"From"}
               />
-              {/* <Autocomplete
-                getItemValue={item => item}
-                items={this.getFilteredList(ac, sourceStation)}
-                renderItem={this.renderItem}
-                value={this.state.sourceStation}
-                onChange={e => this.setState({ sourceStation: e.target.value })}
-                onSelect={val => this.setState({ sourceStation: val })}
-                menuStyle={menuStyle}
-              />*/}
             </div>
             <div className="col-12 col-md-auto py-1">
               <Autosuggest
@@ -255,16 +278,6 @@ class App extends Component {
                   this.setState({ destinationStation })}
                 placeholder={"To"}
               />
-              {/*<Autocomplete
-                getItemValue={item => item}
-                items={this.getFilteredList(ac, destinationStation)}
-                renderItem={this.renderItem}
-                value={this.state.destinationStation}
-                onChange={e =>
-                  this.setState({ destinationStation: e.target.value })}
-                onSelect={val => this.setState({ destinationStation: val })}
-                menuStyle={menuStyle}
-              />*/}
             </div>
             <div className="col-12 col-md-auto py-2">
               <button
@@ -284,16 +297,6 @@ class App extends Component {
         </div>
         <div className="row">
           <div className="col">
-            {/*<div className="progress">
-              <div
-                className="progress-bar"
-                role="progressbar"
-                style={{ width: `${progressValue}%` }}
-                aria-valuenow={progressValue}
-                aria-valuemin="0"
-                aria-valuemax="100"
-              />
-            </div>*/}
             <ProgressBar
               now={numFetches ? trains.length / numFetches * 100 : 0}
             />
@@ -304,11 +307,10 @@ class App extends Component {
             {classes.map((str, idx) => (
               <div className="col-auto" key={str}>
                 <Checkbox
-                  checked
-                  value={classCheckboxes[idx]}
+                  checked={classCheckboxes[idx]}
                   onChange={e => {
-                    var classCheckboxes = this.state.classCheckboxes;
-                    classCheckboxes[idx] = e.target.value;
+                    var classCheckboxes = { ...this.state.classCheckboxes };
+                    classCheckboxes[idx] = e.target.checked;
                     this.setState({ classCheckboxes });
                   }}
                 >
@@ -318,8 +320,9 @@ class App extends Component {
             ))}
             <div className="col-auto ml-auto">
               <Checkbox
-                value={showWaitlist}
-                onChange={e => this.setState({ showWaitlist: e.target.value })}
+                checked={showWaitlist}
+                onChange={e =>
+                  this.setState({ showWaitlist: e.target.checked })}
               >
                 Show Waitlist
               </Checkbox>
@@ -335,20 +338,21 @@ class App extends Component {
               <BootstrapTable
                 keyField="id"
                 data={trains
-                  .filter(train => train.avlDayList)
-                  .filter(({ avlDayList }) =>
-                    avlDayList.find(
-                      ({ availablityDate }) => availablityDate == formattedDate
+                  // filter available/wl
+                  .filter(train =>
+                    allowedAvailablityTypes.find(
+                      availablityType =>
+                        train.availablityType == availablityType
                     )
+                  )
+                  // filter by classes
+                  .filter(train =>
+                    allowedClasses.find(classc => train.classc == classc)
                   )
                   .map(train => {
                     return {
                       ...train,
-                      id: train.trainNo + train.classc,
-                      availablityStatus: train.avlDayList.find(
-                        ({ availablityDate }) =>
-                          availablityDate == formattedDate
-                      ).availablityStatus
+                      id: train.trainNo + train.classc
                     };
                   })}
                 columns={columns}

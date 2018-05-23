@@ -142,23 +142,30 @@ app.post("/api/getTrains", async (req, res) => {
   var dt = moment(date).format("DD-MM-YYYY");
   // now get the trains
   sendInfo(clientId, "Getting Trains...");
-  response = await retryRequest({
-    uri: "http://www.indianrail.gov.in/enquiry/CommonCaptcha",
-    method: "GET",
-    qs: {
-      inputCaptcha: nums[0],
-      dt,
-      sourceStation,
-      destinationStation,
-      flexiWithDate: "y",
-      inputPage: "TBIS",
-      language: "en"
+  response = await retryRequest(
+    {
+      uri: "http://www.indianrail.gov.in/enquiry/CommonCaptcha",
+      method: "GET",
+      qs: {
+        inputCaptcha: nums[0],
+        dt,
+        sourceStation,
+        destinationStation,
+        flexiWithDate: "y",
+        inputPage: "TBIS",
+        language: "en"
+      },
+      jar: jars[0]
     },
-    jar: jars[0]
-  });
+    true
+  );
+  if (!response) {
+    sendOther(clientId, "error", `Error: No response. Did you forget date?`);
+    return;
+  }
   response = JSON.parse(response);
   if (response.errorMessage) {
-    sendInfo(clientId, "Error Fetching Trains.");
+    sendOther(clientId, "error", `Error: ${response.errorMessage}`);
     return;
   }
   // console.log(response);
@@ -204,18 +211,11 @@ app.post("/api/getTrains", async (req, res) => {
       });
     }
   }
-  // sendInfo(
-  //   clientId,
-  //   `Found ${response.trainBtwnStnsList
-  //     .length} trains with ${counter} categories.`
-  // );
   sendInfo(
     clientId,
     `Found ${response.trainBtwnStnsList.length} trains. Fetching schedules...`
   );
   sendOther(clientId, "numFetches", counter);
-  // Debug: find class types
-  var classcDict = {};
   promises = trainRequestsArrays.map(async trainRequests => {
     for (let trainRequest of trainRequests) {
       await delay(100);
@@ -230,8 +230,6 @@ app.post("/api/getTrains", async (req, res) => {
         classc: trainRequest.qs.classc,
         ...trainRequest.other
       };
-      // Debug: find classc
-      classcDict[trainRequest.qs.classc] = 1;
       const { errorMessage } = modifiedResponse;
       if (errorMessage) {
         console.log(errorMessage);
@@ -242,7 +240,6 @@ app.post("/api/getTrains", async (req, res) => {
     return;
   });
   await Promise.all(promises);
-  console.log(classcDict);
   sendOther(clientId, "done", "ok");
   console.log("done");
   sendInfo(clientId, "Done.");
