@@ -1,0 +1,34 @@
+{
+  "name": "client",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "create-react-class": "^15.6.3",
+    "lodash": "^4.17.10",
+    "react": "^16.3.2",
+    "react-16-bootstrap-date-picker": "^5.1.2",
+    "react-autocomplete": "^1.8.1",
+    "react-autosuggest": "^9.3.4",
+    "react-bootstrap": "^0.32.1",
+    "react-bootstrap-date-picker": "^5.1.0",
+    "react-bootstrap-table-next": "^0.1.11",
+    "react-dates": "^16.7.0",
+    "react-dom": "^16.3.2",
+    "react-scripts": "1.1.4",
+    "react-with-styles": "^3.2.0",
+    "reconnecting-websocket": "^4.0.0-rc3",
+    "ws": "^5.2.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  },
+  "proxy": {
+    "/api": {
+      "target": "http://localhost:3001",
+      "ws": true
+    }
+  }
+}
