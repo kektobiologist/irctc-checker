@@ -16,6 +16,8 @@ import {
   Checkbox
 } from "react-bootstrap";
 
+import ac from "./ac.json";
+
 const menuStyle = {
   borderRadius: "3px",
   boxShadow: "0 2px 12px rgba(0, 0, 0, 0.1)",
@@ -32,7 +34,7 @@ const classes = ["1A", "2A", "3A", "SL", "2S", "EC", "CC"];
 
 class App extends Component {
   state = {
-    ac: [],
+    ac,
     date: moment(new Date())
       // .add(7, "days")
       .toISOString(),
@@ -114,7 +116,6 @@ class App extends Component {
       .then(res => res.json())
       .then(ac => {
         this.setState({ ac });
-        console.log(ac);
       });
     // get a unique client id
     var clientId = Math.random()
