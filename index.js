@@ -248,7 +248,7 @@ app.post("/api/getTrains", async (req, res) => {
   await Promise.all(promises);
   sendOther(clientId, "done", "ok");
   console.log("done");
-  sendInfo(clientId, "Done.");
+  // sendInfo(clientId, "Done.");
 });
 
 // react

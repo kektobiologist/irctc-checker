@@ -93,7 +93,18 @@ class App extends Component {
           });
           break;
         case "done":
-          this.setState({ disabled: false });
+          const { trains } = this.state;
+          var numAvailable = trains.filter(
+            train => train.availablityType == "1"
+          ).length;
+          var numWaiting = trains.filter(
+            train =>
+              train.availablityType == "2" || train.availablityType == "3"
+          ).length;
+          this.setState({
+            disabled: false,
+            infoMessage: `Found ${numAvailable} Available, ${numWaiting} Waiting List.`
+          });
           break;
         case "error":
           console.log(message.data);
