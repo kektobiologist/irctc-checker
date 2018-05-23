@@ -197,8 +197,7 @@ class App extends Component {
       },
       {
         dataField: "trainName",
-        text: "Train Name",
-        sort: true
+        text: "Train Name"
       },
       {
         dataField: "classc",
