@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-from matplotlib import pyplot as plt
 import re
 import sys
 # np.set_printoptions(threshold=np.nan)
@@ -36,7 +35,7 @@ img = cv2.imread(sys.argv[1],cv2.IMREAD_UNCHANGED)
 img = img[...,-1]
 
 val = getString(img)
-print solveCaptcha(val)
+print(solveCaptcha(val))
 # img2 = img.copy()
 # template = cv2.imread('../ocr-data/-.png',cv2.IMREAD_UNCHANGED)
 # template = template[...,-1]
