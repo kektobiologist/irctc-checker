@@ -14,7 +14,8 @@ import {
   Col,
   FormGroup,
   FormControl,
-  PageHeader
+  PageHeader,
+  Checkbox
 } from "react-bootstrap";
 
 const menuStyle = {
@@ -29,6 +30,8 @@ const menuStyle = {
   zIndex: 100
 };
 
+const classes = ["1A", "2A", "3A", "SL", "2S", "EC", "CC"];
+
 class App extends Component {
   state = {
     ac: [],
@@ -40,7 +43,9 @@ class App extends Component {
     infoMessage: "",
     trains: [],
     disabled: false,
-    numFetches: 0
+    numFetches: 0,
+    classCheckboxes: classes.map(() => true),
+    showWaitlist: false
   };
   onButtonClicked = () => {
     fetch("/api/solveCaptcha")
@@ -49,7 +54,10 @@ class App extends Component {
   };
 
   createWebsocket = clientId => {
-    var ws = new WebSocket(`ws://localhost:3000/api?id=${clientId}`);
+    var ws = new WebSocket(
+      `ws://${window.location.hostname}:${window.location
+        .port}/api?id=${clientId}`
+    );
     ws.onopen = e => {
       console.log("WebSocketClient connected:", e);
       // this.send("Hello World !");
@@ -76,9 +84,11 @@ class App extends Component {
           break;
         case "error":
           console.log(message.data);
+          this.setState({ disabled: false, infoMessage: message.data });
           break;
       }
     };
+
     ws.onclose = e => {
       console.log("Websocket closed", e);
       setTimeout(() => {
@@ -151,7 +161,10 @@ class App extends Component {
       infoMessage,
       numFetches,
       trains,
-      disabled
+      disabled,
+      date,
+      classCheckboxes,
+      showWaitlist
     } = this.state;
     const columns = [
       {
@@ -160,7 +173,8 @@ class App extends Component {
       },
       {
         dataField: "trainName",
-        text: "Train Name"
+        text: "Train Name",
+        sort: true
       },
       {
         dataField: "classc",
@@ -171,18 +185,32 @@ class App extends Component {
         text: "Availability"
       },
       {
+        dataField: "departureTime",
+        text: "Departure Time"
+      },
+      {
+        dataField: "arrivalTime",
+        text: "Arrival Time"
+      },
+      {
+        dataField: "duration",
+        text: "Duration"
+      },
+      {
         dataField: "totalCollectibleAmount",
-        text: "Fare (Rs.)"
+        text: "Fare (Rs.)",
+        sort: true
       }
     ];
-    var progressValue = numFetches ? trains.length / numFetches * 100 : 0;
+    const formattedDate = moment(date).format("D-M-YYYY");
+
     return (
       <div className="App container">
         <PageHeader>IRCTC Availability Checker</PageHeader>
         <p>{txt}</p>
         <div className="form-group">
           <div className="row">
-            <div className="col">
+            <div className="col-12 col-md-3 py-1">
               {/*<input
                 className="form-control"
                 type="date"
@@ -202,11 +230,12 @@ class App extends Component {
               id="your_unique_id" // PropTypes.string.isRequired,
             />*/}
             </div>
-            <div className="col">
+            <div className="col-12 col-md-auto py-1">
               <Autosuggest
                 suggestions={this.getFilteredList(ac, sourceStation)}
                 value={this.state.sourceStation}
                 onChange={sourceStation => this.setState({ sourceStation })}
+                placeholder={"From"}
               />
               {/* <Autocomplete
                 getItemValue={item => item}
@@ -218,12 +247,13 @@ class App extends Component {
                 menuStyle={menuStyle}
               />*/}
             </div>
-            <div className="col">
+            <div className="col-12 col-md-auto py-1">
               <Autosuggest
                 suggestions={this.getFilteredList(ac, destinationStation)}
                 value={this.state.destinationStation}
                 onChange={destinationStation =>
                   this.setState({ destinationStation })}
+                placeholder={"To"}
               />
               {/*<Autocomplete
                 getItemValue={item => item}
@@ -236,7 +266,7 @@ class App extends Component {
                 menuStyle={menuStyle}
               />*/}
             </div>
-            <div className="col">
+            <div className="col-12 col-md-auto py-2">
               <button
                 className="btn btn-primary"
                 disabled={disabled}
@@ -248,7 +278,9 @@ class App extends Component {
           </div>
         </div>
         <div className="row">
-          <div className="col">{infoMessage}</div>
+          <div className="col pb-3 text-muted">
+            <i>{infoMessage}</i>
+          </div>
         </div>
         <div className="row">
           <div className="col">
@@ -262,24 +294,68 @@ class App extends Component {
                 aria-valuemax="100"
               />
             </div>*/}
-            <ProgressBar now={progressValue} />
+            <ProgressBar
+              now={numFetches ? trains.length / numFetches * 100 : 0}
+            />
           </div>
         </div>
+        {numFetches ? (
+          <div className="row">
+            {classes.map((str, idx) => (
+              <div className="col-auto" key={str}>
+                <Checkbox
+                  checked
+                  value={classCheckboxes[idx]}
+                  onChange={e => {
+                    var classCheckboxes = this.state.classCheckboxes;
+                    classCheckboxes[idx] = e.target.value;
+                    this.setState({ classCheckboxes });
+                  }}
+                >
+                  {str}
+                </Checkbox>
+              </div>
+            ))}
+            <div className="col-auto ml-auto">
+              <Checkbox
+                value={showWaitlist}
+                onChange={e => this.setState({ showWaitlist: e.target.value })}
+              >
+                Show Waitlist
+              </Checkbox>
+            </div>
+          </div>
+        ) : (
+          ""
+        )}
+
         <div className="row">
           <div className="col">
-            <BootstrapTable
-              keyField="id"
-              data={trains.map(train => {
-                return {
-                  ...train,
-                  id: train.trainNo + train.classc,
-                  availablityStatus: train.avlDayList
-                    ? train.avlDayList[0].availablityStatus
-                    : "UNKNOWN"
-                };
-              })}
-              columns={columns}
-            />
+            {numFetches ? (
+              <BootstrapTable
+                keyField="id"
+                data={trains
+                  .filter(train => train.avlDayList)
+                  .filter(({ avlDayList }) =>
+                    avlDayList.find(
+                      ({ availablityDate }) => availablityDate == formattedDate
+                    )
+                  )
+                  .map(train => {
+                    return {
+                      ...train,
+                      id: train.trainNo + train.classc,
+                      availablityStatus: train.avlDayList.find(
+                        ({ availablityDate }) =>
+                          availablityDate == formattedDate
+                      ).availablityStatus
+                    };
+                  })}
+                columns={columns}
+              />
+            ) : (
+              ""
+            )}
           </div>
         </div>
       </div>

@@ -47,30 +47,41 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 // retry request
-var retryRequest = async data => {
+var retryRequest = async (data, dontCheckErrorMessage = false) => {
   while (true) {
     try {
       response = await request({
         ...data,
         timeout: 3000
       });
+      if (!dontCheckErrorMessage) {
+        if (JSON.parse(response).errorMessage) {
+          throw Error({ message: JSON.parse(response).errorMessage });
+        }
+      }
       return response;
-      break;
     } catch (e) {
-      // console.log(e);
+      if (
+        e.message != "Error: ETIMEDOUT" &&
+        e.message != "Error: ESOCKETTIMEDOUT"
+      )
+        console.log(e);
       // sendOther(clientId, "train", JSON.stringify(e));
     }
   }
 };
 
 var solveCaptcha = async (jar, idx) => {
-  img = await retryRequest({
-    uri: "http://www.indianrail.gov.in/enquiry/captchaDraw.png?1526986453735",
-    method: "GET",
-    gzip: true,
-    encoding: null,
-    jar
-  });
+  img = await retryRequest(
+    {
+      uri: "http://www.indianrail.gov.in/enquiry/captchaDraw.png?1526986453735",
+      method: "GET",
+      gzip: true,
+      encoding: null,
+      jar
+    },
+    true
+  );
   fs.writeFileSync(`/tmp/image${idx}.png`, img, "binary");
   val = child_process.execSync(
     `cd scripts && python template_matching.py /tmp/image${idx}.png`
@@ -162,13 +173,21 @@ app.post("/api/getTrains", async (req, res) => {
       avlClasses,
       trainType,
       fromStnCode,
-      toStnCode
+      toStnCode,
+      arrivalTime,
+      departureTime,
+      duration
     } = train;
     var traintype = trainType[0];
     for (let classc of avlClasses) {
       counter += 1;
       var idx = counter % numJars;
       trainRequestsArrays[idx].push({
+        other: {
+          arrivalTime,
+          departureTime,
+          duration
+        },
         qs: {
           inputCaptcha: nums[idx],
           inputPage: "TBIS_CALL_FOR_FARE",
@@ -195,7 +214,8 @@ app.post("/api/getTrains", async (req, res) => {
     `Found ${response.trainBtwnStnsList.length} trains. Fetching schedules...`
   );
   sendOther(clientId, "numFetches", counter);
-
+  // Debug: find class types
+  var classcDict = {};
   promises = trainRequestsArrays.map(async trainRequests => {
     for (let trainRequest of trainRequests) {
       await delay(100);
@@ -207,8 +227,11 @@ app.post("/api/getTrains", async (req, res) => {
       modifiedResponse = {
         ...JSON.parse(response),
         trainNo: trainRequest.qs.trainNo,
-        classc: trainRequest.qs.classc
+        classc: trainRequest.qs.classc,
+        ...trainRequest.other
       };
+      // Debug: find classc
+      classcDict[trainRequest.qs.classc] = 1;
       const { errorMessage } = modifiedResponse;
       if (errorMessage) {
         console.log(errorMessage);
@@ -219,6 +242,7 @@ app.post("/api/getTrains", async (req, res) => {
     return;
   });
   await Promise.all(promises);
+  console.log(classcDict);
   sendOther(clientId, "done", "ok");
   console.log("done");
   sendInfo(clientId, "Done.");
