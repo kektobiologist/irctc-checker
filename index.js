@@ -38,11 +38,20 @@ wss.on("connection", (ws, req) => {
   ws.id = parameters.query.id;
   // also add to connections
   connections[ws.id] = ws;
-  // wss.clients.forEach(function each(client) {
-  //   console.log("Client.ID: " + client.id);
-  // });
 
-  // ws.send("something");
+  // send ping packets to prevent heroku h15 idling error
+  var id = setInterval(function() {
+    ws.send(
+      JSON.stringify({
+        type: "ping",
+        data: "ping"
+      })
+    );
+  }, 20000);
+
+  ws.on("close", function() {
+    clearInterval(id);
+  });
 });
 
 const bodyParser = require("body-parser");
@@ -52,16 +61,22 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 // retry request
-var retryRequest = async (data, dontCheckErrorMessage = false) => {
+var retryRequest = async (
+  data,
+  dontCheckErrorMessage = false,
+  maxRetries = 10
+) => {
+  counter = 0;
   while (true) {
+    counter += 1;
     try {
       response = await request({
         ...data,
         timeout: 3000
       });
-      if (!dontCheckErrorMessage) {
+      if (!dontCheckErrorMessage && response) {
         if (JSON.parse(response).errorMessage) {
-          throw Error({ message: JSON.parse(response).errorMessage });
+          throw Error("Error: " + JSON.parse(response).errorMessage);
         }
       }
       return response;
@@ -71,6 +86,10 @@ var retryRequest = async (data, dontCheckErrorMessage = false) => {
         e.message != "Error: ESOCKETTIMEDOUT"
       )
         console.log(e);
+      if (counter >= maxRetries) {
+        // throw the error, recipient will handle it
+        throw e;
+      }
       // sendOther(clientId, "train", JSON.stringify(e));
     }
   }
@@ -131,6 +150,7 @@ var sendOther = (clientId, type, data) => {
 };
 
 app.post("/api/getTrains", async (req, res) => {
+  // get sourceStation, destinationStation, etc. from client req
   const { sourceStation, destinationStation, date, clientId } = req.body;
   var numJars = 10;
   var jars = _.range(numJars).map(() => request.jar());
@@ -140,40 +160,38 @@ app.post("/api/getTrains", async (req, res) => {
   var nums = await Promise.all(jars.map((jar, idx) => solveCaptcha(jar, idx)));
   console.log(nums);
   // console.log(jars);
-  // var num = await solveCaptcha();
-  // get sourceStation, destinationStation, date
 
   // sleep?
   await delay(100);
   var dt = moment(date).format("DD-MM-YYYY");
-  // now get the trains
+  // now get the trains. use first jar
   sendInfo(clientId, "Getting Trains...");
-  response = await retryRequest(
-    {
-      uri: "http://www.indianrail.gov.in/enquiry/CommonCaptcha",
-      method: "GET",
-      qs: {
-        inputCaptcha: nums[0],
-        dt,
-        sourceStation,
-        destinationStation,
-        flexiWithDate: "y",
-        inputPage: "TBIS",
-        language: "en"
+  try {
+    response = await retryRequest(
+      {
+        uri: "http://www.indianrail.gov.in/enquiry/CommonCaptcha",
+        method: "GET",
+        qs: {
+          inputCaptcha: nums[0],
+          dt,
+          sourceStation,
+          destinationStation,
+          flexiWithDate: "y",
+          inputPage: "TBIS",
+          language: "en"
+        },
+        jar: jars[0]
       },
-      jar: jars[0]
-    },
-    true
-  );
-  if (!response) {
-    sendOther(clientId, "error", `Error: No response. Did you forget date?`);
+      false,
+      1
+    );
+    if (!response) throw Error("Error: No response. Did you forget date?");
+  } catch (e) {
+    console.log(e);
+    sendOther(clientId, "error", e.message);
     return;
   }
   response = JSON.parse(response);
-  if (response.errorMessage) {
-    sendOther(clientId, "error", `Error: ${response.errorMessage}`);
-    return;
-  }
   // console.log(response);
   const { quotaList } = response;
   // wait a bit again
@@ -225,23 +243,23 @@ app.post("/api/getTrains", async (req, res) => {
   promises = trainRequestsArrays.map(async trainRequests => {
     for (let trainRequest of trainRequests) {
       await delay(100);
-      response = await retryRequest({
-        uri: "http://www.indianrail.gov.in/enquiry/CommonCaptcha",
-        method: "GET",
-        ...trainRequest
-      });
-      modifiedResponse = {
-        ...JSON.parse(response),
-        trainNo: trainRequest.qs.trainNo,
-        classc: trainRequest.qs.classc,
-        ...trainRequest.other
-      };
-      const { errorMessage } = modifiedResponse;
-      if (errorMessage) {
-        console.log(errorMessage);
-        sendOther(clientId, "error", errorMessage);
+      try {
+        response = await retryRequest({
+          uri: "http://www.indianrail.gov.in/enquiry/CommonCaptcha",
+          method: "GET",
+          ...trainRequest
+        });
+        modifiedResponse = {
+          ...JSON.parse(response),
+          trainNo: trainRequest.qs.trainNo,
+          classc: trainRequest.qs.classc,
+          ...trainRequest.other
+        };
+        sendOther(clientId, "train", JSON.stringify(modifiedResponse));
+      } catch (e) {
+        // cannot proceed with this req, send an error to client
+        sendOther(clientId, "error", `${e.message}`);
       }
-      sendOther(clientId, "train", JSON.stringify(modifiedResponse));
     }
     return;
   });
